@@ -1,0 +1,3032 @@
+D8_S1_A1 SELECT JDBC
+package com.wecp;
+
+import java.sql.*;
+import java.util.Scanner;
+
+public class Main {
+    private static final String dburl="jdbc:mysql://localhost:3306/movieDB_wecp";
+    private static final String user = "root";
+  private static final String password = "hellowecp";
+ 
+public Connection getConnection(String dburl,String user,String password)throws SQLException{
+    return DriverManager.getConnection(dburl,user,password);
+ 
+}
+public ResultSet getMoviesByYear(Connection conn,Date year)throws SQLException{
+    String query="SELECT movieId,movieName,movieReleasedYear FROM Movies WHERE movieReleasedYear = ?";
+    PreparedStatement pstmt=conn.prepareStatement(query);
+    pstmt.setDate(1, year);
+    return pstmt.executeQuery();
+}
+
+
+
+D9_S2_A2 movie management
+D9_S2_A2_Creating a Movie Management System Using JDBC and Layered Architecture
+
+package com.wecp.entity;
+
+public class Movie {
+    private int id;
+    private String title;
+    private int releaseYear;
+    private String genre;
+    private double rating;
+
+    // Getters and Setters
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public int getReleaseYear() {
+        return releaseYear;
+    }
+
+    public void setReleaseYear(int releaseYear) {
+        this.releaseYear = releaseYear;
+    }
+
+    public String getGenre() {
+        return genre;
+    }
+
+    public void setGenre(String genre) {
+        this.genre = genre;
+    }
+
+    public double getRating() {
+        return rating;
+    }
+
+    public void setRating(double rating) {
+        this.rating = rating;
+    }
+}
+---------------
+
+
+package com.wecp.dao;
+
+import com.wecp.entity.Movie;
+
+import java.util.List;
+
+public interface MovieDao {
+    void createMovie(Movie movie);
+    Movie getMovieById(int id);
+    List<Movie> getAllMovies();
+    void updateMovie(Movie movie);
+    void deleteMovie(int id);
+}
+
+
+----------------
+
+package com.wecp.dao;
+
+import com.wecp.entity.Movie;
+
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class MovieDaoImpl implements MovieDao {
+    private Connection connection;
+
+    public MovieDaoImpl(Connection connection) {
+        this.connection = connection;
+    }
+
+    @Override
+    public void createMovie(Movie movie) {
+        String query = "INSERT INTO movie (title, release_year, genre, rating) VALUES (?, ?, ?, ?)";
+        try (PreparedStatement statement = connection.prepareStatement(query)) {
+            statement.setString(1, movie.getTitle());
+            statement.setInt(2, movie.getReleaseYear());
+            statement.setString(3, movie.getGenre());
+            statement.setDouble(4, movie.getRating());
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public Movie getMovieById(int id) {
+        String query = "SELECT * FROM movie WHERE id = ?";
+        try (PreparedStatement statement = connection.prepareStatement(query)) {
+            statement.setInt(1, id);
+            ResultSet rs = statement.executeQuery();
+            if (rs.next()) {
+                return mapRowToMovie(rs);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    @Override
+    public List<Movie> getAllMovies() {
+        List<Movie> movies = new ArrayList<>();
+        String query = "SELECT * FROM movie";
+        try (Statement statement = connection.createStatement()) {
+            ResultSet rs = statement.executeQuery(query);
+            while (rs.next()) {
+                movies.add(mapRowToMovie(rs));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return movies;
+    }
+
+    @Override
+    public void updateMovie(Movie movie) {
+        String query = "UPDATE movie SET title = ?, release_year = ?, genre = ?, rating = ? WHERE id = ?";
+        try (PreparedStatement statement = connection.prepareStatement(query)) {
+            statement.setString(1, movie.getTitle());
+            statement.setInt(2, movie.getReleaseYear());
+            statement.setString(3, movie.getGenre());
+            statement.setDouble(4, movie.getRating());
+            statement.setInt(5, movie.getId());
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void deleteMovie(int id) {
+        String query = "DELETE FROM movie WHERE id = ?";
+        try (PreparedStatement statement = connection.prepareStatement(query)) {
+            statement.setInt(1, id);
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private Movie mapRowToMovie(ResultSet rs) throws SQLException {
+        Movie movie = new Movie();
+        movie.setId(rs.getInt("id"));
+        movie.setTitle(rs.getString("title"));
+        movie.setReleaseYear(rs.getInt("release_year"));
+        movie.setGenre(rs.getString("genre"));
+        movie.setRating(rs.getDouble("rating"));
+        return movie;
+    }
+}
+
+-------------
+
+package com.wecp.service;
+
+import com.wecp.entity.Movie;
+
+import java.util.List;
+
+public interface MovieService {
+    void createMovie(Movie movie);
+    Movie getMovieById(int id);
+    List<Movie> getAllMovies();
+    void updateMovie(Movie movie);
+    void deleteMovie(int id);
+}
+
+
+---------------
+
+
+package com.wecp.service;
+
+import com.wecp.dao.MovieDao;
+import com.wecp.entity.Movie;
+import com.wecp.exception.InvalidRatingException;
+import com.wecp.exception.InvalidReleaseYearException;
+
+import java.util.List;
+
+public class MovieServiceImpl implements MovieService {
+    private MovieDao movieDao;
+
+    public MovieServiceImpl(MovieDao movieDao) {
+        this.movieDao = movieDao;
+    }
+
+    @Override
+    public void createMovie(Movie movie) {
+        validateMovie(movie);
+        movieDao.createMovie(movie);
+    }
+
+    @Override
+    public Movie getMovieById(int id) {
+        return movieDao.getMovieById(id);
+    }
+
+    @Override
+    public List<Movie> getAllMovies() {
+        return movieDao.getAllMovies();
+    }
+
+    @Override
+    public void updateMovie(Movie movie) {
+        validateMovie(movie);
+        movieDao.updateMovie(movie);
+    }
+
+    @Override
+    public void deleteMovie(int id) {
+        movieDao.deleteMovie(id);
+    }
+
+    private void validateMovie(Movie movie) {
+        if (movie.getReleaseYear() > 2024) {
+            throw new InvalidReleaseYearException("Release year cannot be in the future.");
+        }
+        if (movie.getRating() < 0) {
+            throw new InvalidRatingException("Rating must be between 0 and 10.");
+        }
+    }
+}
+
+--------------------
+
+
+package com.wecp.exception;
+
+public class InvalidRatingException extends RuntimeException {
+    public InvalidRatingException(String message) {
+        super(message);
+    }
+}
+
+---------------------
+
+package com.wecp.exception;
+
+public class InvalidReleaseYearException extends RuntimeException {
+    public InvalidReleaseYearException(String message) {
+        super(message);
+    }
+}
+
+----------------------
+
+
+package com.wecp;
+
+import com.wecp.dao.MovieDao;
+import com.wecp.dao.MovieDaoImpl;
+import com.wecp.entity.Movie;
+import com.wecp.service.MovieService;
+import com.wecp.service.MovieServiceImpl;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.util.List;
+
+
+public class Main {
+    public static void main(String[] args) {
+        // Database connection setup
+        String url = "jdbc:mysql://localhost:3306/movieDB_wecp";
+        String user = "root";
+        String password = "hellowecp";
+
+        try (Connection connection = DriverManager.getConnection(url, user, password)) {
+            MovieDao movieDao = new MovieDaoImpl(connection);
+            MovieService movieService = new MovieServiceImpl(movieDao);
+
+            // Create a new movie
+            Movie movie = new Movie();
+            movie.setTitle("Inception");
+            movie.setReleaseYear(2010);
+            movie.setGenre("Sci-Fi");
+            movie.setRating(8.8);
+            movieService.createMovie(movie);
+
+            // Get all movies
+            List<Movie> movies = movieService.getAllMovies();
+            System.out.println("Movies in the database:");
+            for (Movie m : movies) {
+                System.out.println(m.getTitle() + " (" + m.getReleaseYear() + ")");
+            }
+
+            // Update movie
+            movie.setRating(9.0);
+            movieService.updateMovie(movie);
+
+            // Get updated movie
+            Movie updatedMovie = movieService.getMovieById(movie.getId());
+            System.out.println("Updated movie rating: " + updatedMovie.getRating());
+
+            // Delete movie
+            movieService.deleteMovie(movie.getId());
+
+            System.out.println("Movie deleted successfully!");
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+
+
+package com.university;
+
+public class Student {
+
+    private String firstName;
+    private String lastName;
+    private String studentId;
+    private String email;
+
+    public Student(String firstName, String lastName, String studentId, String email) {
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.studentId = studentId;
+        this.email = email;
+    }
+
+    @Override
+    public String toString() {
+        return "Student{" +
+                "firstName='" + firstName + '\'' +
+                ", lastName='" + lastName + '\'' +
+                ", studentId='" + studentId + '\'' +
+                ", email='" + email + '\'' +
+                '}';
+    }
+
+    public String getFirstName() {
+        return firstName;
+    }
+
+    public String getLastName() {
+        return lastName;
+    }
+
+    public String getStudentId() {
+        return studentId;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+
+}
+package com.university;
+
+
+
+import java.io.*;
+import javax.servlet.*;
+import javax.servlet.http.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class StudentServlet extends HttpServlet  {
+    protected void  doGet(HttpServletRequest request,HttpServletResponse response)
+    throws ServletException,IOException{
+        List<Student> studentList=new ArrayList<>();
+        studentList.add(new Student("John","Doe","s123", "john.doe@example.com"));
+        studentList.add(new Student("Jane","Smith","s124", "jane.smith@example.com"));
+        studentList.add(new Student("Michel","Johnson","s125", "micheal.johnson@example.com"));
+        request.setAttribute("studentList", studentList);
+        request.getRequestDispatcher("students.jsp").forward(request,response);
+
+    }
+
+}
+
+<web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee
+         https://jakarta.ee/xml/ns/jakartaee/web-app_5_0.xsd"
+         version="5.0">
+
+    <!-- complete this file -->
+    <servlet>
+    <servlet-name>StudentServlet</servlet-name>
+    <servlet-class>com.university.StudentServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+    <servlet-name>StudentServlet</servlet-name>
+    <url-pattern>/students</url-pattern>
+    </servlet-mapping>
+
+
+</web-app>
+<%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<%@ page import="java.util.List" %>
+<%@ page import="com.university.Student" %>
+<%
+    RequestDispatcher dispacther=request.getRequestDispatcher("students");
+    dispacther.forward(request,response);
+    %>
+    <%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<%@ page import="java.util.List" %>
+<%@ page import="com.university.Student" %>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student List</title>
+</head>
+<body>
+    <h1>Student List</h1>
+    <table border="1">
+        <tr>
+            <th>First Name</th>
+            <th>Last Name</th>
+            <th>Student ID</th>
+            <th>Email</th>
+        </tr>
+        <%
+            List<Student> studentList=(List<Student>)request.getAttribute("studentList");
+                if(studentList !=null){
+                    for(Student student:studentList){
+                        %>
+                    <tr>
+                        <td><%=student.getFirstName()%></td>
+                        <td><%=student.getLastName()%></td>
+                        <td><%=student.getStudentId()%></td>
+                        <td><%=student.getEmail()%></td>
+                    </tr>
+                <%
+                    }
+                }else{
+                    %>
+                    <tr>
+                        <td co="4">No Students Found.</td>
+                    </tr>
+                    <%
+                }
+                %>
+    </table>
+    
+</body>
+</html>
+
+
+
+
+
+D14 S2_AS1 EMPLOYEE MANAGEMENT
+public String getFirstName() {
+        return firstName;
+    }
+
+
+
+
+
+
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
+    }
+
+
+
+
+
+
+    public String getLastName() {
+        return lastName;
+    }
+
+
+
+
+
+
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
+    }
+
+
+
+
+
+
+    public String getPosition() {
+        return position;
+    }
+
+
+
+
+
+
+    public void setPosition(String position) {
+        this.position = position;
+    }
+
+
+
+
+
+
+    public double getSalary() {
+        return salary;
+    }
+
+
+
+
+
+
+    public void setSalary(double salary) {
+        this.salary = salary;
+    }
+    
+
+
+
+
+
+
+    public int getEmployeeId() {
+        return employeeId;
+    }
+
+
+
+
+
+
+    public void setEmployeeId(int employeeId) {
+        this.employeeId = employeeId;
+    }
+
+
+package com.wecp.springcore.service;
+
+import com.wecp.springcore.model.Employee;
+
+public interface EmployeeService {
+    void registerEmployee(Employee employee);
+
+    Employee getEmployeeById(int employeeId);
+
+}
+
+
+
+package com.wecp.springcore.service;
+
+import com.wecp.springcore.dao.EmployeeDAO;
+import com.wecp.springcore.model.Employee;
+
+public class EmployeeServiceImpl implements EmployeeService {
+    private EmployeeDAO employeeDAO;
+    public EmployeeServiceImpl(EmployeeDAO employeeDAO){
+        this.employeeDAO=employeeDAO;
+    }
+    @Override
+    public void registerEmployee(Employee employee){
+        employeeDAO.save(employee);
+    }
+    @Override
+    public Employee getEmployeeById(int employeeId){
+        return employeeDAO.findById(employeeId);
+    }
+
+
+}
+
+
+
+package com.wecp.springcore.dao;
+
+import com.wecp.springcore.model.Employee;
+
+public interface EmployeeDAO {
+
+    void save(Employee employee);
+
+    Employee findById(int employeeId);
+
+}
+
+
+
+
+package com.wecp.springcore.dao;
+
+import com.wecp.springcore.model.Employee;
+
+import java.util.HashMap;
+
+import java.util.Map;
+
+
+
+public class EmployeeDAOImpl implements EmployeeDAO {
+
+
+    // store the data in below map
+    private Map<Integer, Employee> employeeMap = new HashMap<>();
+    @Override
+    public void save(Employee employee){
+        employeeMap.put(employee.getEmployeeId(),employee);
+    }
+    @Override
+    public Employee findById(int employeeId){
+        return employeeMap.get(employeeId);
+    }
+
+
+    // implement the code here
+
+}
+
+
+
+
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+                           http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <!-- Define your beans here -->
+    <bean id="employeeDAO" class="com.wecp.springcore.dao.EmployeeDAOImp1"/>
+    <bean id="employeeService" class="com.wecp.springcore.service.EmployeeServiceImp1">
+        <constructor-arg ref="employeeDAO"/>
+        </bean>
+
+</beans>
+
+
+
+
+
+D14 S1_AS1_ONLINE SHOPPING
+
+package com.wecp.springcore.service;
+
+import com.wecp.springcore.model.Product;
+import com.wecp.springcore.model.ShoppingCart;
+
+public class ShoppingCartServiceImpl implements ShoppingCartService {
+
+    private ShoppingCart shoppingCart = new ShoppingCart();
+
+    @Override
+    public void addProductToCart(Product product,int quantity){
+        shoppingCart.addProduct(product,quantity);
+    }
+    @Override
+    public void removeProductFromCart(Product product){
+        shoppingCart.removeProduct(product);
+    }
+
+        @Override
+        public ShoppingCart getShoppingCart(){
+            return shoppingCart;
+        }
+    }
+
+
+
+package com.wecp.springcore.service;
+
+import com.wecp.springcore.model.User;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class UserServiceImpl implements UserService {
+    private Map<String, User> userDatabase = new HashMap<>();
+    @Override
+    public void registerUser(User user){
+        if(userDatabase.containsKey(user.getUsername())){
+            throw new IllegalArgumentException("Username already exists.");
+
+} 
+userDatabase.put(user.getUsername(),user); 
+  }
+  @Override
+  public User getUserByUsername(String username){
+    return userDatabase.get(username);
+  }
+
+    // implement the user service interface methods here
+
+}
+
+
+
+
+package com.wecp.springcore.service;
+
+import com.wecp.springcore.model.Product;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class ProductServiceImpl implements ProductService {
+private Map<String, Product> productDatabase = new HashMap<>();
+@Override
+public void addProduct(Product product){
+    productDatabase.put(product.getProductId(),product);
+}
+@Override
+public void updateProduct(Product product){
+    if(productDatabase.containsKey(product.getProductId())){
+        productDatabase.put(product.getProductId(),product);
+    }else{
+        throw new IllegalArgumentException("Product not found.");
+    }
+
+
+}
+@Override
+public void deleteProduct(String productId){
+    productDatabase.remove(productId);
+}
+@Override
+public Product getProductById(String productId){
+    return productDatabase.get(productId);
+}
+    
+
+}
+
+
+
+
+
+
+package com.wecp.springcore.model;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+
+public class ShoppingCart {
+
+    private Map<Product, Integer> cartItems = new HashMap<>();
+    public void addProduct(Product product,int quantity)
+
+    {
+        
+       cartItems.put(product,quantity);
+
+    }
+    public void removeProduct(Product product){
+        cartItems.remove(product);
+
+    }
+    public Map<Product,Integer>getCartItems(){
+        return cartItems;
+
+    }
+    public double getTotalPrice(){
+        return cartItems.entrySet().stream() 
+        .mapToDouble(e -> e.getKey().getPrice() * e.getValue()) 
+        .sum();
+    }
+
+    
+
+  
+// Create a method addProduct which takes the argument product and quantity and adds the product to the cartItems map
+//Create a method removeProduct which takes the argument product and removes the product from the cartItems map
+//Create a method getCartItems that allows you to fetch the cartItems map
+//Create a method getTotalPrice to return the total price of the cartItems as a double value
+
+    
+
+
+    
+
+
+
+    @Override
+    public String toString() {
+        return "ShoppingCart{" +
+                "cartItems=" + cartItems +
+                '}';
+    }
+
+}
+
+
+
+
+
+package com.wecp.springcore.model;
+
+import java.util.Map;
+
+public class Product {
+
+ //Define the product model here
+ private String productId;
+ private String productName;
+ private double price;
+ private int quantityInStock;
+ 
+   
+    public String getProductId() {
+    return productId;
+}
+
+
+public void setProductId(String productId) {
+    this.productId = productId;
+}
+
+
+public String getProductName() {
+    return productName;
+}
+
+
+public void setProductName(String productName) {
+    this.productName = productName;
+}
+
+
+public double getPrice() {
+    return price;
+}
+
+
+public void setPrice(double price) {
+    this.price = price;
+}
+
+
+public int getQuantityInStock() {
+    return quantityInStock;
+}
+
+
+public void setQuantityInStock(int quantityInStock) {
+    this.quantityInStock = quantityInStock;
+}
+
+
+    @Override
+    public String toString() {
+        return "Product{" +
+                "productId='" + productId + '\'' +
+                ", productName='" + productName + '\'' +
+                ", price=" + price +
+                ", quantityInStock=" + quantityInStock +
+                '}';
+    }
+
+
+    public static Map<Product, Integer> getCartItems() {
+        return null;
+    }
+
+}
+
+
+
+package com.wecp.springcore.model;
+
+public class User {
+    // Define the user model here
+    private String username;
+    public String getUsername() {
+        return username;
+    }
+
+
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+
+
+    public String getPassword() {
+        return password;
+    }
+
+
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+
+
+    private String password;
+    
+
+  
+    @Override
+    public String toString() {
+        return "User{" +
+                "username='" + username + '\'' +
+                '}';
+    }
+
+}
+
+
+
+
+
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+                           http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <!-- Define a beans here -->Imp1
+    <bean id="productService" class="com.wecp.springcore.service.ProductServiceImp1"/>
+    <bean id="userService" class="com.wecp.springcore.service.UserServiceImp1"/>
+    <bean id="shoppingCartService" class="com.wecp.springcore.service.ShoppingCartServiceImp1"/>
+    
+
+</beans>
+
+
+D16_library management
+package com.wecp.simplified_library_management_system.controller;
+
+import com.wecp.simplified_library_management_system.model.Book;
+import com.wecp.simplified_library_management_system.service.BookService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+
+import org.springframework.http.ResponseEntity;
+
+import org.springframework.web.bind.annotation.*;
+
+
+
+import java.util.List;
+@RestController
+@RequestMapping("/books")
+public class BookController {
+    @Autowired
+    private BookService bookService;
+    @GetMapping
+    public List <Book> getAllBooks(){
+        return bookService.getAllBooks();
+    }
+    @GetMapping("/{bookId}")
+    public ResponseEntity<Book> getBookById(@PathVariable long bookId){
+        Book book=bookService.getBookById(bookId);
+        return ResponseEntity.ok(book);
+    }
+    @PostMapping
+    public ResponseEntity<Book> createBook(@RequestBody Book book){
+        Book createBook=bookService.createBook(book);
+        return new ResponseEntity<>(createBook,HttpStatus.CREATED);
+    }
+    @PutMapping("/{bookId}")
+    public ResponseEntity<Book> updateBook(
+        @PathVariable Long bookId,@RequestBody Book book){
+            Book updatedBook=bookService.updateBook(bookId, book);
+            return ResponseEntity.ok(updatedBook);
+
+        }
+        @DeleteMapping("/{bookId}")
+        public ResponseEntity<String> deleteBook(@PathVariable Long bookId){
+            bookService.deleteBook(bookId);
+            return ResponseEntity.ok("Book deleted succeddfully");
+        }
+    }
+
+
+
+package com.wecp.simplified_library_management_system.exception;
+
+import org.springframework.http.HttpStatus;
+
+import org.springframework.http.ResponseEntity;
+
+import org.springframework.web.bind.annotation.ControllerAdvice;
+
+import org.springframework.web.bind.annotation.ExceptionHandler;
+@ControllerAdvice
+public class GlobalExceptionHandler {
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<String>handleRuntimeException(RuntimeException ex){
+        return new ResponseEntity<>(ex.getMessage(),HttpStatus.NOT_FOUND);
+    }
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<String> handleGeneralException(Exception e){
+        return new ResponseEntity<>("An error occurred: " + e.getMessage(),HttpStatus.INTERNAL_SERVER_ERROR);
+
+    }
+
+ 
+}
+
+
+package com.wecp.simplified_library_management_system.model;
+ 
+ 
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+ 
+@Entity
+public class Book {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String title;
+    private String author;
+    private String isbn;
+    private int quantity;
+ 
+    public Book(){        
+    }
+ 
+    public Book(Long id, String title, String author, String isbn, int quantity) {
+        this.id = id;
+        this.title = title;
+        this.author = author;
+        this.isbn = isbn;
+        this.quantity = quantity;
+    }
+ 
+    public Long getId() {
+        return id;
+    }
+ 
+    public void setId(Long id) {
+        this.id = id;
+    }
+ 
+    public String getTitle() {
+        return title;
+    }
+ 
+    public void setTitle(String title) {
+        this.title = title;
+    }
+ 
+    public String getAuthor() {
+        return author;
+    }
+ 
+    public void setAuthor(String author) {
+        this.author = author;
+    }
+ 
+    public String getIsbn() {
+        return isbn;
+    }
+ 
+    public void setIsbn(String isbn) {
+        this.isbn = isbn;
+    }
+ 
+    public int getQuantity() {
+        return quantity;
+    }
+ 
+    public void setQuantity(int quantity) {
+        this.quantity = quantity;
+    }
+ 
+}
+ 
+
+package com.wecp.simplified_library_management_system.repository;
+
+
+import com.wecp.simplified_library_management_system.model.Book;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface BookRepository extends JpaRepository<Book,Long>{
+
+}
+
+
+package com.wecp.simplified_library_management_system.service;
+
+import com.wecp.simplified_library_management_system.model.Book;
+import com.wecp.simplified_library_management_system.repository.BookRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class BookServiceImpl implements BookService {
+    @Autowired
+    private BookRepository bookRepository;
+
+    @Override
+    public List<Book> getAllBooks() {
+        // TODO Auto-generated method stub
+        return bookRepository.findAll();
+        //throw new UnsupportedOperationException("Unimplemented method 'getAllBooks'");
+    }
+
+    @Override
+    public Book getBookById(Long id) {
+        // TODO Auto-generated method stub
+        return bookRepository.findById(id)
+                .orElseThrow(()->new RuntimeException("Book not founr with id " + id));
+        //throw new UnsupportedOperationException("Unimplemented method 'getBookById'");
+    }
+
+    @Override
+    public Book createBook(Book book) {
+        // TODO Auto-generated method stub
+        return bookRepository.save(book);
+        //throw new UnsupportedOperationException("Unimplemented method 'createBook'");
+    }
+
+    @Override
+    public Book updateBook(Long id, Book book) {
+        // TODO Auto-generated method stub
+        if(!bookRepository.existsById(id)){
+            throw new RuntimeException("Book not found with id "+ id);
+        }
+        book.setId(id);
+        return bookRepository.save(book);
+       // throw new UnsupportedOperationException("Unimplemented method 'updateBook'");
+    }
+
+    @Override
+    public void deleteBook(Long id) {
+        // TODO Auto-generated method stub
+        if(!bookRepository.existsById(id)){
+            throw new RuntimeException("Book not found with id "+id);
+        }
+        bookRepository.deleteById(id);
+        //throw new UnsupportedOperationException("Unimplemented method 'deleteBook'");
+    }
+
+
+
+
+D17 S1_A1 EMPLOYEE
+package com.wecp.w2day4task2.entity;
+
+
+import javax.persistence.*;
+
+@Entity
+public class Employee {
+    @Id
+    @GeneratedValue(strategy=GenerationType.IDENTITY)
+    private Long id;
+    private String firstName;
+    private String lastName;
+    private String email;
+    private String phoneNumber;
+    private double salary;
+    public Employee(){
+
+    }
+    public Employee(Long id, String firstName, String lastName, String email, String phoneNumber, double salary) {
+        this.id = id;
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.email = email;
+        this.phoneNumber = phoneNumber;
+        this.salary = salary;
+    }
+    public Long getId() {
+        return id;
+    }
+    public void setId(Long id) {
+        this.id = id;
+    }
+    public String getFirstName() {
+        return firstName;
+    }
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
+    }
+    public String getLastName() {
+        return lastName;
+    }
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
+    }
+    public String getEmail() {
+        return email;
+    }
+    public void setEmail(String email) {
+        this.email = email;
+    }
+    public String getPhoneNumber() {
+        return phoneNumber;
+    }
+    public void setPhoneNumber(String phoneNumber) {
+        this.phoneNumber = phoneNumber;
+    }
+    public double getSalary() {
+        return salary;
+    }
+    public void setSalary(double salary) {
+        this.salary = salary;
+    }
+    
+
+
+    
+}
+
+
+package com.wecp.w2day4task2.repository;
+
+import com.wecp.w2day4task2.entity.Employee;
+
+import net.bytebuddy.asm.Advice.Return;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.repository.CrudRepository;
+import org.springframework.stereotype.Repository;
+
+
+public interface EmployeeRepository extends JpaRepository<Employee,Long>  {
+    Employee findEmployeeById(Long id);
+    // implement jpa repository for crud operation
+}
+
+
+
+package com.wecp.w2day4task2.service;
+
+
+import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
+import com.wecp.w2day4task2.entity.Employee;
+import com.wecp.w2day4task2.exception.InvalidSalaryException;
+import com.wecp.w2day4task2.repository.EmployeeRepository;
+
+import org.hibernate.SQLQuery.ReturnProperty;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+@Service
+public class EmployeeService {
+   @Autowired
+   private EmployeeRepository employeeRepository;
+   public Employee createEmployee(Employee employee){
+      if(employee.getSalary()<0){
+         throw new InvalidSalaryException("Salary not in range");
+      }
+      return employeeRepository.save(employee);
+   }
+   public Employee getEmployeeById(Long Id){
+      return employeeRepository.findById(Id).orElse(null);
+   }
+   public Employee updateEmployee(Long Id,Employee updatedemployee){
+      if(updatedemployee.getSalary()<0){
+         throw new InvalidSalaryException("Salary not in range");
+      }
+      return employeeRepository.save(updatedemployee);
+   }
+   public void deleteEmployee(Long Id){
+      employeeRepository.deleteById(Id);
+   }
+   
+
+   }
+   
+
+
+
+  package com.wecp.w2day4task2.exception;
+
+
+public class InvalidSalaryException extends RuntimeException{
+    public InvalidSalaryException(String message){
+        super(message);
+    }
+    // implement custom exception here
+}
+
+ 
+
+
+
+
+
+
+
+
+package com.wecp.progressive.dao;
+
+import com.wecp.progressive.config.DatabaseConnectionManager;
+import com.wecp.progressive.entity.Match;
+
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class MatchDAOImpl implements MatchDAO {
+
+    @Override
+    public int addMatch(Match match) throws SQLException {
+        Connection connection = null;
+        PreparedStatement statement = null;
+        int generatedID = -1;
+
+        try {
+            connection = DatabaseConnectionManager.getConnection();
+            String sql = "INSERT INTO matches (first_team_id, second_team_id, match_date, venue, result, status, winner_team_id) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            statement = connection.prepareStatement(sql, PreparedStatement.RETURN_GENERATED_KEYS);
+
+            statement.setInt(1, match.getFirstTeamId());
+            statement.setInt(2, match.getSecondTeamId());
+            statement.setDate(3, new java.sql.Date(match.getMatchDate().getTime()));
+            statement.setString(4, match.getVenue());
+            statement.setString(5, match.getResult());
+            statement.setString(6, match.getStatus());
+            statement.setInt(7, match.getWinnerTeamId());
+
+            statement.executeUpdate();
+
+            ResultSet resultSet = statement.getGeneratedKeys();
+            if (resultSet.next()) {
+                generatedID = resultSet.getInt(1);
+                match.setMatchId(generatedID);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw e;
+        } finally {
+            if (statement != null) {
+                statement.close();
+            }
+            if (connection != null) {
+                connection.close();
+            }
+        }
+        return generatedID;
+    }
+
+    @Override
+    public Match getMatchById(int matchId) throws SQLException {
+        Connection connection = null;
+        PreparedStatement statement = null;
+        ResultSet resultSet = null;
+
+        try {
+            connection = DatabaseConnectionManager.getConnection();
+            String sql = "SELECT * FROM matches WHERE match_id = ?";
+            statement = connection.prepareStatement(sql);
+            statement.setInt(1, matchId);
+            resultSet = statement.executeQuery();
+
+            if (resultSet.next()) {
+                int firstTeamId = resultSet.getInt("first_team_id");
+                int secondTeamId = resultSet.getInt("second_team_id");
+                Date matchDate = resultSet.getDate("match_date");
+                String venue = resultSet.getString("venue");
+                String result = resultSet.getString("result");
+                String status = resultSet.getString("status");
+                int winnerTeamId = resultSet.getInt("winner_team_id");
+
+                return new Match(matchId, firstTeamId, secondTeamId, matchDate, venue, result, status, winnerTeamId);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw e;
+        } finally {
+            if (resultSet != null) {
+                resultSet.close();
+            }
+            if (statement != null) {
+                statement.close();
+            }
+            if (connection != null) {
+                connection.close();
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public void updateMatch(Match match) throws SQLException {
+        Connection connection = null;
+        PreparedStatement statement = null;
+
+        try {
+            connection = DatabaseConnectionManager.getConnection();
+            String sql = "UPDATE matches SET first_team_id = ?, second_team_id = ?, match_date = ?, venue = ?, result = ?, status = ?, winner_team_id = ? WHERE match_id = ?";
+            statement = connection.prepareStatement(sql);
+            statement.setInt(1, match.getFirstTeamId());
+            statement.setInt(2, match.getSecondTeamId());
+            statement.setDate(3, new java.sql.Date(match.getMatchDate().getTime()));
+            statement.setString(4, match.getVenue());
+            statement.setString(5, match.getResult());
+            statement.setString(6, match.getStatus());
+            statement.setInt(7, match.getWinnerTeamId());
+            statement.setInt(8, match.getMatchId());
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw e;
+        } finally {
+            if (connection != null) {
+                connection.close();
+            }
+        }
+    }
+
+    @Override
+    public void deleteMatch(int matchId) throws SQLException {
+        Connection connection = null;
+        PreparedStatement statement = null;
+
+        try {
+            connection = DatabaseConnectionManager.getConnection();
+            String sql = "DELETE FROM matches WHERE match_id = ?";
+            statement = connection.prepareStatement(sql);
+            statement.setInt(1, matchId);
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw e;
+        } finally {
+            if (connection != null) {
+                connection.close();
+            }
+        }
+    }
+
+    @Override
+    public List<Match> getAllMatches() throws SQLException {
+        List<Match> matches = new ArrayList<>();
+        Connection connection = null;
+        PreparedStatement statement = null;
+        ResultSet resultSet = null;
+
+        try {
+            connection = DatabaseConnectionManager.getConnection();
+            String sql = "SELECT * FROM matches";
+            statement = connection.prepareStatement(sql);
+            resultSet = statement.executeQuery();
+
+            while (resultSet.next()) {
+                int matchId = resultSet.getInt("match_id");
+                int firstTeamId = resultSet.getInt("first_team_id");
+                int secondTeamId = resultSet.getInt("second_team_id");
+                Date matchDate = resultSet.getDate("match_date");
+                String venue = resultSet.getString("venue");
+                String result = resultSet.getString("result");
+                String status = resultSet.getString("status");
+                int winnerTeamId = resultSet.getInt("winner_team_id");
+
+                matches.add(new Match(matchId, firstTeamId, secondTeamId, matchDate, venue, result, status, winnerTeamId));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw e;
+        } finally {
+            if (connection != null) {
+                connection.close();
+            }
+        }
+        return matches;
+    }
+
+}
+
+
+
+
+package com.wecp.progressive.dao;
+
+
+import com.wecp.progressive.config.DatabaseConnectionManager;
+import com.wecp.progressive.entity.Team;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+
+public class TeamDAOImpl implements TeamDAO {
+
+    @Override
+    public int addTeam(Team team) throws SQLException {
+        Connection connection = null;
+        PreparedStatement statement = null;
+        int generatedID = -1;
+
+        try {
+            connection = DatabaseConnectionManager.getConnection();
+            String sql = "INSERT INTO team (team_name, location, owner_name, establishment_year) VALUES (?, ?, ?, ?)";
+            statement = connection.prepareStatement(sql, PreparedStatement.RETURN_GENERATED_KEYS);
+
+            statement.setString(1, team.getTeamName());
+            statement.setString(2, team.getLocation());
+            statement.setString(3, team.getOwnerName());
+            statement.setInt(4, team.getEstablishmentYear());
+
+            statement.executeUpdate();
+
+            ResultSet resultSet = statement.getGeneratedKeys();
+            if (resultSet.next()) {
+                generatedID = resultSet.getInt(1);
+                team.setTeamId(generatedID);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw e;
+        } finally {
+            if (statement != null) {
+                statement.close();
+            }
+            if (connection != null) {
+                connection.close();
+            }
+        }
+        return generatedID;
+    }
+
+    @Override
+    public Team getTeamById(int teamId) throws SQLException {
+        Connection connection = null;
+        PreparedStatement statement = null;
+        ResultSet resultSet = null;
+
+        try {
+            connection = DatabaseConnectionManager.getConnection();
+            String sql = "SELECT * FROM team WHERE team_id = ?";
+            statement = connection.prepareStatement(sql);
+            statement.setInt(1, teamId);
+            resultSet = statement.executeQuery();
+
+            if (resultSet.next()) {
+                String teamName = resultSet.getString("team_name");
+                String location = resultSet.getString("location");
+                String ownerName = resultSet.getString("owner_name");
+                int establishmentYear = resultSet.getInt("establishment_year");
+
+                return new Team(teamId, teamName, location, ownerName, establishmentYear);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw e;
+        } finally {
+            if (resultSet != null) {
+                resultSet.close();
+            }
+            if (statement != null) {
+                statement.close();
+            }
+            if (connection != null) {
+                connection.close();
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public void updateTeam(Team team) throws SQLException {
+        Connection connection = null;
+        PreparedStatement statement = null;
+
+        try {
+            connection = DatabaseConnectionManager.getConnection();
+            String sql = "UPDATE team SET team_name = ?, location = ?, owner_name = ?, establishment_year = ? WHERE team_id = ?";
+            statement = connection.prepareStatement(sql);
+            statement.setString(1, team.getTeamName());
+            statement.setString(2, team.getLocation());
+            statement.setString(3, team.getOwnerName());
+            statement.setInt(4, team.getEstablishmentYear());
+            statement.setInt(5, team.getTeamId());
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw e; // Rethrow the exception
+        } finally {
+            if (connection != null) {
+                connection.close();
+            }
+        }
+    }
+
+    @Override
+    public void deleteTeam(int teamId) throws SQLException {
+        Connection connection = null;
+        PreparedStatement statement = null;
+
+        try {
+            connection = DatabaseConnectionManager.getConnection();
+            String sql = "DELETE FROM team WHERE team_id = ?";
+            statement = connection.prepareStatement(sql);
+            statement.setInt(1, teamId);
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw e; // Rethrow the exception
+        } finally {
+            if (connection != null) {
+                connection.close();
+            }
+        }
+    }
+
+    @Override
+    public List<Team> getAllTeams() throws SQLException {
+        List<Team> teams = new ArrayList<>();
+        Connection connection = null;
+        PreparedStatement statement = null;
+        ResultSet resultSet = null;
+
+        try {
+            connection = DatabaseConnectionManager.getConnection();
+            String sql = "SELECT * FROM team";
+            statement = connection.prepareStatement(sql);
+            resultSet = statement.executeQuery();
+
+            while (resultSet.next()) {
+                int teamId = resultSet.getInt("team_id");
+                String teamName = resultSet.getString("team_name");
+                String location = resultSet.getString("location");
+                String ownerName = resultSet.getString("owner_name");
+                int establishmentYear = resultSet.getInt("establishment_year");
+                teams.add(new Team(teamId, teamName, location, ownerName, establishmentYear));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw e; // Rethrow the exception
+        } finally {
+            if (connection != null) {
+                connection.close();
+            }
+        }
+        return teams;
+    }
+
+}
+
+
+
+
+package com.wecp.progressive.service.impl;
+
+import com.wecp.progressive.dao.CricketerDAO;
+import com.wecp.progressive.entity.Cricketer;
+import com.wecp.progressive.service.CricketerService;
+
+import java.sql.SQLException;
+import java.util.Comparator;
+import java.util.List;
+
+public class CricketerServiceImplJdbc implements CricketerService {
+
+    private CricketerDAO cricketerDAO;
+
+    public CricketerServiceImplJdbc(CricketerDAO cricketerDAO) {
+        this.cricketerDAO = cricketerDAO;
+    }
+
+    @Override
+    public List<Cricketer> getAllCricketers() throws SQLException {
+        return cricketerDAO.getAllCricketers();
+    }
+
+    @Override
+    public Integer addCricketer(Cricketer cricketer) throws SQLException {
+        return cricketerDAO.addCricketer(cricketer);
+    }
+
+    @Override
+    public List<Cricketer> getAllCricketersSortedByExperience() throws SQLException {
+        List<Cricketer> sortedCricketers = cricketerDAO.getAllCricketers();
+        if (!sortedCricketers.isEmpty()) {
+            sortedCricketers.sort(Comparator.comparing(Cricketer::getExperience));
+        }
+        return sortedCricketers;
+    }
+
+    @Override
+    public void updateCricketer(Cricketer cricketer) throws SQLException {
+        cricketerDAO.updateCricketer(cricketer);
+    }
+
+    @Override
+    public void deleteCricketer(int cricketerId) throws SQLException {
+        cricketerDAO.deleteCricketer(cricketerId);
+    }
+
+    @Override
+    public Cricketer getCricketerById(int cricketerId) throws SQLException {
+        return cricketerDAO.getCricketerById(cricketerId);
+    }
+}package com.wecp.progressive.dao;
+
+
+import com.wecp.progressive.config.DatabaseConnectionManager;
+import com.wecp.progressive.entity.Team;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+
+public class TeamDAOImpl implements TeamDAO {
+
+    @Override
+    public int addTeam(Team team) throws SQLException {
+        Connection connection = null;
+        PreparedStatement statement = null;
+        int generatedID = -1;
+
+        try {
+            connection = DatabaseConnectionManager.getConnection();
+            String sql = "INSERT INTO team (team_name, location, owner_name, establishment_year) VALUES (?, ?, ?, ?)";
+            statement = connection.prepareStatement(sql, PreparedStatement.RETURN_GENERATED_KEYS);
+
+            statement.setString(1, team.getTeamName());
+            statement.setString(2, team.getLocation());
+            statement.setString(3, team.getOwnerName());
+            statement.setInt(4, team.getEstablishmentYear());
+
+            statement.executeUpdate();
+
+            ResultSet resultSet = statement.getGeneratedKeys();
+            if (resultSet.next()) {
+                generatedID = resultSet.getInt(1);
+                team.setTeamId(generatedID);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw e;
+        } finally {
+            if (statement != null) {
+                statement.close();
+            }
+            if (connection != null) {
+                connection.close();
+            }
+        }
+        return generatedID;
+    }
+
+    @Override
+    public Team getTeamById(int teamId) throws SQLException {
+        Connection connection = null;
+        PreparedStatement statement = null;
+        ResultSet resultSet = null;
+
+        try {
+            connection = DatabaseConnectionManager.getConnection();
+            String sql = "SELECT * FROM team WHERE team_id = ?";
+            statement = connection.prepareStatement(sql);
+            statement.setInt(1, teamId);
+            resultSet = statement.executeQuery();
+
+            if (resultSet.next()) {
+                String teamName = resultSet.getString("team_name");
+                String location = resultSet.getString("location");
+                String ownerName = resultSet.getString("owner_name");
+                int establishmentYear = resultSet.getInt("establishment_year");
+
+                return new Team(teamId, teamName, location, ownerName, establishmentYear);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw e;
+        } finally {
+            if (resultSet != null) {
+                resultSet.close();
+            }
+            if (statement != null) {
+                statement.close();
+            }
+            if (connection != null) {
+                connection.close();
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public void updateTeam(Team team) throws SQLException {
+        Connection connection = null;
+        PreparedStatement statement = null;
+
+        try {
+            connection = DatabaseConnectionManager.getConnection();
+            String sql = "UPDATE team SET team_name = ?, location = ?, owner_name = ?, establishment_year = ? WHERE team_id = ?";
+            statement = connection.prepareStatement(sql);
+            statement.setString(1, team.getTeamName());
+            statement.setString(2, team.getLocation());
+            statement.setString(3, team.getOwnerName());
+            statement.setInt(4, team.getEstablishmentYear());
+            statement.setInt(5, team.getTeamId());
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw e; // Rethrow the exception
+        } finally {
+            if (connection != null) {
+                connection.close();
+            }
+        }
+    }
+
+    @Override
+    public void deleteTeam(int teamId) throws SQLException {
+        Connection connection = null;
+        PreparedStatement statement = null;
+
+        try {
+            connection = DatabaseConnectionManager.getConnection();
+            String sql = "DELETE FROM team WHERE team_id = ?";
+            statement = connection.prepareStatement(sql);
+            statement.setInt(1, teamId);
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw e; // Rethrow the exception
+        } finally {
+            if (connection != null) {
+                connection.close();
+            }
+        }
+    }
+
+    @Override
+    public List<Team> getAllTeams() throws SQLException {
+        List<Team> teams = new ArrayList<>();
+        Connection connection = null;
+        PreparedStatement statement = null;
+        ResultSet resultSet = null;
+
+        try {
+            connection = DatabaseConnectionManager.getConnection();
+            String sql = "SELECT * FROM team";
+            statement = connection.prepareStatement(sql);
+            resultSet = statement.executeQuery();
+
+            while (resultSet.next()) {
+                int teamId = resultSet.getInt("team_id");
+                String teamName = resultSet.getString("team_name");
+                String location = resultSet.getString("location");
+                String ownerName = resultSet.getString("owner_name");
+                int establishmentYear = resultSet.getInt("establishment_year");
+                teams.add(new Team(teamId, teamName, location, ownerName, establishmentYear));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw e; // Rethrow the exception
+        } finally {
+            if (connection != null) {
+                connection.close();
+            }
+        }
+        return teams;
+    }
+
+}
+
+
+
+
+package com.wecp.progressive.service.impl;
+
+import com.wecp.progressive.dao.MatchDAO;
+import com.wecp.progressive.entity.Match;
+import com.wecp.progressive.service.MatchService;
+
+import java.sql.SQLException;
+import java.util.List;
+
+public class MatchServiceImplJdbc implements MatchService {
+
+    private MatchDAO matchDAO;
+
+    public MatchServiceImplJdbc(MatchDAO matchDAO) {
+        this.matchDAO = matchDAO;
+    }
+
+    @Override
+    public List<Match> getAllMatches() throws SQLException {
+        return matchDAO.getAllMatches();
+    }
+
+    @Override
+    public Match getMatchById(int matchId) throws SQLException {
+        return matchDAO.getMatchById(matchId);
+    }
+
+    @Override
+    public Integer addMatch(Match match) throws SQLException {
+        return matchDAO.addMatch(match);
+    }
+
+    @Override
+    public void updateMatch(Match match) throws SQLException {
+        matchDAO.updateMatch(match);
+    }
+
+    @Override
+    public void deleteMatch(int matchId) throws SQLException {
+        matchDAO.deleteMatch(matchId);
+    }
+
+}
+
+
+
+
+package com.wecp.progressive.service.impl;
+
+import com.wecp.progressive.dao.MatchDAO;
+import com.wecp.progressive.entity.Match;
+import com.wecp.progressive.service.MatchService;
+
+import java.sql.SQLException;
+import java.util.List;
+
+public class MatchServiceImplJdbc implements MatchService {
+
+    private MatchDAO matchDAO;
+
+    public MatchServiceImplJdbc(MatchDAO matchDAO) {
+        this.matchDAO = matchDAO;
+    }
+
+    @Override
+    public List<Match> getAllMatches() throws SQLException {
+        return matchDAO.getAllMatches();
+    }
+
+    @Override
+    public Match getMatchById(int matchId) throws SQLException {
+        return matchDAO.getMatchById(matchId);
+    }
+
+    @Override
+    public Integer addMatch(Match match) throws SQLException {
+        return matchDAO.addMatch(match);
+    }
+
+    @Override
+    public void updateMatch(Match match) throws SQLException {
+        matchDAO.updateMatch(match);
+    }
+
+    @Override
+    public void deleteMatch(int matchId) throws SQLException {
+        matchDAO.deleteMatch(matchId);
+    }
+
+}
+
+
+
+package com.wecp.progressive.service.impl;
+
+import com.wecp.progressive.dao.TeamDAO;
+import com.wecp.progressive.entity.Team;
+import com.wecp.progressive.service.TeamService;
+
+import java.sql.SQLException;
+import java.util.Comparator;
+import java.util.List;
+
+public class TeamServiceImplJdbc implements TeamService {
+
+    private TeamDAO teamDAO;
+
+    public TeamServiceImplJdbc(TeamDAO teamDAO) {
+        this.teamDAO = teamDAO;
+    }
+
+    @Override
+    public List<Team> getAllTeams() throws SQLException {
+        return teamDAO.getAllTeams();
+    }
+
+    @Override
+    public int addTeam(Team team) throws SQLException {
+        return teamDAO.addTeam(team);
+    }
+
+    @Override
+    public List<Team> getAllTeamsSortedByName() throws SQLException {
+        List<Team> sortedTeams = teamDAO.getAllTeams();
+        if (!sortedTeams.isEmpty()) {
+            sortedTeams.sort(Comparator.comparing(Team::getTeamName));
+        }
+        return sortedTeams;
+    }
+
+    @Override
+    public Team getTeamById(int teamId) throws SQLException {
+        return teamDAO.getTeamById(teamId);
+    }
+
+    @Override
+    public void updateTeam(Team team) throws SQLException {
+        teamDAO.updateTeam(team);
+    }
+
+    @Override
+    public void deleteTeam(int teamId) throws SQLException {
+        teamDAO.deleteTeam(teamId);
+    }
+}
+
+
+
+
+
+
+
+
+
+POST /api/directors
+
+{
+  "name": "Christopher Nolan",
+  "nationality": "British-American"
+}
+
+
+
+POST /api/movies
+
+{
+  "title": "Inception",
+  "genre": "Sci-Fi",
+  "director": {
+    "id": 1
+  }
+}
+
+
+PUT /api/directors/1
+
+{
+  "name": "Christopher Nolan",
+  "nationality": "American"
+}
+
+
+{
+    "name": "Updated Director Name",
+    "nationality": "Updated Nationality",
+    "movies": [
+        {
+            "id": 1,
+            "title": "Movie Title",
+            "genre": "Genre"
+        },
+        {
+            "id": 2,
+            "title": "Another Movie Title",
+            "genre": "Another Genre"
+        }
+    ]
+}
+
+
+
+
+
+PUT /api/movies/1
+
+{
+  "title": "Inception",
+  "genre": "Science Fiction",
+  "director": {
+    "id": 1
+  }
+}
+
+
+     existmovie.setDirector(updatedMovie.getDirector())
+
+
+{
+    "title": "Updated Movie Title",
+    "genre": "Updated Genre",
+    "director": {
+        "id": 1,
+        "name": "Existing Director Name",
+        "nationality": "Existing Nationality"
+    }
+}
+
+
+Ensure that the id fields correspond to existing entities in your database.
+
+For Movie update, the director field should reference an existing Director entity.
+
+For Director update, the movies list should reference existing Movie entities if you want to modify associated movies. If no changes to the movie list are needed, you can omit the movies field.
+
+
+
+
+GET /api/movies/director/1
+
+[
+  {
+    "id": 1,
+    "title": "Inception",
+    "genre": "Science Fiction",
+    "director": {
+      "id": 1,
+      "name": "Christopher Nolan",
+      "nationality": "American"
+    }
+  }
+]
+
+
+
+---------
+
+package com.example.moviedirector.entity;
+
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import jakarta.persistence.*;
+
+@Entity
+public class Movie {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String title;
+
+    private String genre;
+
+    @ManyToOne
+    @JoinColumn(name = "director_id")
+    @JsonBackReference
+    private Director director;
+
+    // Getters and Setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public String getGenre() {
+        return genre;
+    }
+
+    public void setGenre(String genre) {
+        this.genre = genre;
+    }
+
+    public Director getDirector() {
+        return director;
+    }
+
+    public void setDirector(Director director) {
+        this.director = director;
+    }
+}
+
+------------
+
+package com.example.moviedirector.entity;
+
+import com.fasterxml.jackson.annotation.JsonManagedReference;
+import jakarta.persistence.*;
+import java.util.List;
+
+@Entity
+public class Director {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String name;
+
+    private String nationality;
+
+    @OneToMany(mappedBy = "director", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    private List<Movie> movies;
+
+    // Getters and Setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getNationality() {
+        return nationality;
+    }
+
+    public void setNationality(String nationality) {
+        this.nationality = nationality;
+    }
+
+    public List<Movie> getMovies() {
+        return movies;
+    }
+
+    public void setMovies(List<Movie> movies) {
+        this.movies = movies;
+    }
+}
+
+
+-----------
+
+package com.example.moviedirector.repository;
+
+import com.example.moviedirector.entity.Movie;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import java.util.List;
+
+public interface MovieRepository extends JpaRepository<Movie, Long> {
+
+    @Query("SELECT m FROM Movie m JOIN FETCH m.director WHERE m.director.id = :directorId")
+    List<Movie> findMoviesByDirectorId(@Param("directorId") Long directorId);
+
+    @Query("SELECT m FROM Movie m JOIN FETCH m.director WHERE m.director.name = :directorName")
+    List<Movie> findMoviesByDirectorName(@Param("directorName") String directorName);
+
+   @Query("SELECT m FROM Movie m JOIN FETCH m.director WHERE m.director.name = :directorName AND m.director.nationality = :nationality")
+    List<Movie> findMoviesByDirectorNameAndNationality(@Param("directorName") String directorName, @Param("nationality") String nationality);
+
+}
+}
+
+-----------
+
+package com.example.moviedirector.repository;
+
+import com.example.moviedirector.entity.Director;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface DirectorRepository extends JpaRepository<Director, Long> {
+}
+
+----------
+
+package com.example.moviedirector.service;
+
+import com.example.moviedirector.entity.Movie;
+import com.example.moviedirector.repository.MovieRepository;
+import org.springframework.stereotype.Service;
+import java.util.List;
+
+@Service
+public class MovieService {
+
+    private final MovieRepository movieRepository;
+
+    public MovieService(MovieRepository movieRepository) {
+        this.movieRepository = movieRepository;
+    }
+
+    public List<Movie> getAllMovies() {
+        return movieRepository.findAll();
+    }
+
+    public Movie getMovieById(Long id) {
+        return movieRepository.findById(id).orElse(null);
+    }
+
+    public List<Movie> getMoviesByDirectorId(Long directorId) {
+        return movieRepository.findMoviesByDirectorId(directorId);
+    }
+
+    public Movie saveMovie(Movie movie) {
+        return movieRepository.save(movie);
+    }
+
+    public void deleteMovie(Long id) {
+        movieRepository.deleteById(id);
+    }
+
+
+    public Movie updateMovie(Long id, Movie updatedMovie) {
+
+
+        return movieRepository.findById(id).map(movie -> {
+            movie.setTitle(updatedMovie.getTitle());
+            movie.setGenre(updatedMovie.getGenre());
+            movie.setDirector(updatedMovie.getDirector());
+            return movieRepository.save(movie);
+        }).orElse(null);
+    }
+
+
+
+    public Movie updateMovie(Long id, Movie updatedMovie) {
+        Movie existingMovie = movieRepository.findById(id).orElse(null);
+        if (existingMovie != null) {
+            existingMovie.setTitle(updatedMovie.getTitle());
+            existingMovie.setGenre(updatedMovie.getGenre());
+            existingMovie.setDirector(updatedMovie.getDirector());
+            return movieRepository.save(existingMovie);
+        }
+        return null;
+    }
+}
+
+
+--------------
+
+package com.example.moviedirector.service;
+
+import com.example.moviedirector.entity.Director;
+import com.example.moviedirector.repository.DirectorRepository;
+import org.springframework.stereotype.Service;
+import java.util.List;
+
+@Service
+public class DirectorService {
+
+    private final DirectorRepository directorRepository;
+
+    public DirectorService(DirectorRepository directorRepository) {
+        this.directorRepository = directorRepository;
+    }
+
+    public List<Director> getAllDirectors() {
+        return directorRepository.findAll();
+    }
+
+    public Director getDirectorById(Long id) {
+        return directorRepository.findById(id).orElse(null);
+    }
+
+    public Director saveDirector(Director director) {
+        return directorRepository.save(director);
+    }
+
+    public void deleteDirector(Long id) {
+        directorRepository.deleteById(id);
+    }
+
+    public Director updateDirector(Long id, Director updatedDirector) {
+        return directorRepository.findById(id).map(director -> {
+            director.setName(updatedDirector.getName());
+            director.setNationality(updatedDirector.getNationality());
+            return directorRepository.save(director);
+        }).orElse(null);
+    }
+
+     public Director updateDirector(Long id, Director updatedDirector) {
+        Director existingDirector = directorRepository.findById(id).orElse(null);
+        if (existingDirector != null) {
+            existingDirector.setName(updatedDirector.getName());
+            existingDirector.setNationality(updatedDirector.getNationality());
+            return directorRepository.save(existingDirector);
+        }
+        return null;
+    }
+}
+
+------------------
+
+package com.example.moviedirector.controller;
+
+import com.example.moviedirector.entity.Movie;
+import com.example.moviedirector.service.MovieService;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/movies")
+public class MovieController {
+
+    private final MovieService movieService;
+
+    public MovieController(MovieService movieService) {
+        this.movieService = movieService;
+    }
+
+    @GetMapping
+    public List<Movie> getAllMovies() {
+        return movieService.getAllMovies();
+    }
+
+    @GetMapping("/{id}")
+    public Movie getMovieById(@PathVariable Long id) {
+        return movieService.getMovieById(id);
+    }
+
+    @GetMapping("/director/{directorId}")
+    public List<Movie> getMoviesByDirectorId(@PathVariable Long directorId) {
+        return movieService.getMoviesByDirectorId(directorId);
+    }
+
+    @PostMapping
+    public Movie createMovie(@RequestBody Movie movie) {
+        return movieService.saveMovie(movie);
+    }
+
+    @PutMapping("/{id}")
+    public Movie updateMovie(@PathVariable Long id, @RequestBody Movie movie) {
+        movie.setId(id);
+        return movieService.saveMovie(movie);
+    }
+
+    @DeleteMapping("/{id}")
+    public void deleteMovie(@PathVariable Long id) {
+        movieService.deleteMovie(id);
+    }
+}
+
+-----------
+
+package com.example.moviedirector.controller;
+
+import com.example.moviedirector.entity.Director;
+import com.example.moviedirector.service.DirectorService;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/directors")
+public class DirectorController {
+
+    private final DirectorService directorService;
+
+    public DirectorController(DirectorService directorService) {
+        this.directorService = directorService;
+    }
+
+    @GetMapping
+    public List<Director> getAllDirectors() {
+        return directorService.getAllDirectors();
+    }
+
+    @GetMapping("/{id}")
+    public Director getDirectorById(@PathVariable Long id) {
+        return directorService.getDirectorById(id);
+    }
+
+    @PostMapping
+    public Director createDirector(@RequestBody Director director) {
+        return directorService.saveDirector(director);
+    }
+
+    @PutMapping("/{id}")
+    public Director updateDirector(@PathVariable Long id, @RequestBody Director director) {
+        director.setId(id);
+        return directorService.saveDirector(director);
+    }
+
+    @DeleteMapping("/{id}")
+    public void deleteDirector(@PathVariable Long id) {
+        directorService.deleteDirector(id);
+    }
+}
+
+------
+
+
+
+POST /api/directors
+
+{
+  "name": "Christopher Nolan",
+  "nationality": "British-American"
+}
+
+
+
+POST /api/movies
+
+{
+  "title": "Inception",
+  "genre": "Sci-Fi",
+  "director": {
+    "id": 1
+  }
+}
+
+
+PUT /api/directors/1
+
+{
+  "name": "Christopher Nolan",
+  "nationality": "American"
+}
+
+
+{
+    "name": "Updated Director Name",
+    "nationality": "Updated Nationality",
+    "movies": [
+        {
+            "id": 1,
+            "title": "Movie Title",
+            "genre": "Genre"
+        },
+        {
+            "id": 2,
+            "title": "Another Movie Title",
+            "genre": "Another Genre"
+        }
+    ]
+}
+
+
+
+
+
+PUT /api/movies/1
+
+{
+  "title": "Inception",
+  "genre": "Science Fiction",
+  "director": {
+    "id": 1
+  }
+}
+
+
+     existmovie.setDirector(updatedMovie.getDirector())
+
+
+{
+    "title": "Updated Movie Title",
+    "genre": "Updated Genre",
+    "director": {
+        "id": 1,
+        "name": "Existing Director Name",
+        "nationality": "Existing Nationality"
+    }
+}
+
+
+Ensure that the id fields correspond to existing entities in your database.
+
+For Movie update, the director field should reference an existing Director entity.
+
+For Director update, the movies list should reference existing Movie entities if you want to modify associated movies. If no changes to the movie list are needed, you can omit the movies field.
+
+
+
+
+GET /api/movies/director/1
+
+[
+  {
+    "id": 1,
+    "title": "Inception",
+    "genre": "Science Fiction",
+    "director": {
+      "id": 1,
+      "name": "Christopher Nolan",
+      "nationality": "American"
+    }
+  }
+]
+
+
+
+---------
+
+package com.example.moviedirector.entity;
+
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import jakarta.persistence.*;
+
+@Entity
+public class Movie {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String title;
+
+    private String genre;
+
+    @ManyToOne
+    @JoinColumn(name = "director_id")
+    @JsonBackReference
+    private Director director;
+
+    // Getters and Setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public String getGenre() {
+        return genre;
+    }
+
+    public void setGenre(String genre) {
+        this.genre = genre;
+    }
+
+    public Director getDirector() {
+        return director;
+    }
+
+    public void setDirector(Director director) {
+        this.director = director;
+    }
+}
+
+------------
+
+package com.example.moviedirector.entity;
+
+import com.fasterxml.jackson.annotation.JsonManagedReference;
+import jakarta.persistence.*;
+import java.util.List;
+
+@Entity
+public class Director {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String name;
+
+    private String nationality;
+
+    @OneToMany(mappedBy = "director", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    private List<Movie> movies;
+
+    // Getters and Setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getNationality() {
+        return nationality;
+    }
+
+    public void setNationality(String nationality) {
+        this.nationality = nationality;
+    }
+
+    public List<Movie> getMovies() {
+        return movies;
+    }
+
+    public void setMovies(List<Movie> movies) {
+        this.movies = movies;
+    }
+}
+
+
+-----------
+
+package com.example.moviedirector.repository;
+
+import com.example.moviedirector.entity.Movie;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import java.util.List;
+
+public interface MovieRepository extends JpaRepository<Movie, Long> {
+
+    @Query("SELECT m FROM Movie m JOIN FETCH m.director WHERE m.director.id = :directorId")
+    List<Movie> findMoviesByDirectorId(@Param("directorId") Long directorId);
+
+    @Query("SELECT m FROM Movie m JOIN FETCH m.director WHERE m.director.name = :directorName")
+    List<Movie> findMoviesByDirectorName(@Param("directorName") String directorName);
+
+   @Query("SELECT m FROM Movie m JOIN FETCH m.director WHERE m.director.name = :directorName AND m.director.nationality = :nationality")
+    List<Movie> findMoviesByDirectorNameAndNationality(@Param("directorName") String directorName, @Param("nationality") String nationality);
+
+}
+}
+
+-----------
+
+package com.example.moviedirector.repository;
+
+import com.example.moviedirector.entity.Director;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface DirectorRepository extends JpaRepository<Director, Long> {
+}
+
+----------
+
+package com.example.moviedirector.service;
+
+import com.example.moviedirector.entity.Movie;
+import com.example.moviedirector.repository.MovieRepository;
+import org.springframework.stereotype.Service;
+import java.util.List;
+
+@Service
+public class MovieService {
+
+    private final MovieRepository movieRepository;
+
+    public MovieService(MovieRepository movieRepository) {
+        this.movieRepository = movieRepository;
+    }
+
+    public List<Movie> getAllMovies() {
+        return movieRepository.findAll();
+    }
+
+    public Movie getMovieById(Long id) {
+        return movieRepository.findById(id).orElse(null);
+    }
+
+    public List<Movie> getMoviesByDirectorId(Long directorId) {
+        return movieRepository.findMoviesByDirectorId(directorId);
+    }
+
+    public Movie saveMovie(Movie movie) {
+        return movieRepository.save(movie);
+    }
+
+    public void deleteMovie(Long id) {
+        movieRepository.deleteById(id);
+    }
+
+
+    public Movie updateMovie(Long id, Movie updatedMovie) {
+
+
+        return movieRepository.findById(id).map(movie -> {
+            movie.setTitle(updatedMovie.getTitle());
+            movie.setGenre(updatedMovie.getGenre());
+            movie.setDirector(updatedMovie.getDirector());
+            return movieRepository.save(movie);
+        }).orElse(null);
+    }
+
+
+
+    public Movie updateMovie(Long id, Movie updatedMovie) {
+        Movie existingMovie = movieRepository.findById(id).orElse(null);
+        if (existingMovie != null) {
+            existingMovie.setTitle(updatedMovie.getTitle());
+            existingMovie.setGenre(updatedMovie.getGenre());
+            existingMovie.setDirector(updatedMovie.getDirector());
+            return movieRepository.save(existingMovie);
+        }
+        return null;
+    }
+}
+
+
+--------------
+
+package com.example.moviedirector.service;
+
+import com.example.moviedirector.entity.Director;
+import com.example.moviedirector.repository.DirectorRepository;
+import org.springframework.stereotype.Service;
+import java.util.List;
+
+@Service
+public class DirectorService {
+
+    private final DirectorRepository directorRepository;
+
+    public DirectorService(DirectorRepository directorRepository) {
+        this.directorRepository = directorRepository;
+    }
+
+    public List<Director> getAllDirectors() {
+        return directorRepository.findAll();
+    }
+
+    public Director getDirectorById(Long id) {
+        return directorRepository.findById(id).orElse(null);
+    }
+
+    public Director saveDirector(Director director) {
+        return directorRepository.save(director);
+    }
+
+    public void deleteDirector(Long id) {
+        directorRepository.deleteById(id);
+    }
+
+    public Director updateDirector(Long id, Director updatedDirector) {
+        return directorRepository.findById(id).map(director -> {
+            director.setName(updatedDirector.getName());
+            director.setNationality(updatedDirector.getNationality());
+            return directorRepository.save(director);
+        }).orElse(null);
+    }
+
+     public Director updateDirector(Long id, Director updatedDirector) {
+        Director existingDirector = directorRepository.findById(id).orElse(null);
+        if (existingDirector != null) {
+            existingDirector.setName(updatedDirector.getName());
+            existingDirector.setNationality(updatedDirector.getNationality());
+            return directorRepository.save(existingDirector);
+        }
+        return null;
+    }
+}
+
+------------------
+
+package com.example.moviedirector.controller;
+
+import com.example.moviedirector.entity.Movie;
+import com.example.moviedirector.service.MovieService;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/movies")
+public class MovieController {
+
+    private final MovieService movieService;
+
+    public MovieController(MovieService movieService) {
+        this.movieService = movieService;
+    }
+
+    @GetMapping
+    public List<Movie> getAllMovies() {
+        return movieService.getAllMovies();
+    }
+
+    @GetMapping("/{id}")
+    public Movie getMovieById(@PathVariable Long id) {
+        return movieService.getMovieById(id);
+    }
+
+    @GetMapping("/director/{directorId}")
+    public List<Movie> getMoviesByDirectorId(@PathVariable Long directorId) {
+        return movieService.getMoviesByDirectorId(directorId);
+    }
+
+    @PostMapping
+    public Movie createMovie(@RequestBody Movie movie) {
+        return movieService.saveMovie(movie);
+    }
+
+    @PutMapping("/{id}")
+    public Movie updateMovie(@PathVariable Long id, @RequestBody Movie movie) {
+        movie.setId(id);
+        return movieService.saveMovie(movie);
+    }
+
+    @DeleteMapping("/{id}")
+    public void deleteMovie(@PathVariable Long id) {
+        movieService.deleteMovie(id);
+    }
+}
+
+-----------
+
+package com.example.moviedirector.controller;
+
+import com.example.moviedirector.entity.Director;
+import com.example.moviedirector.service.DirectorService;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/directors")
+public class DirectorController {
+
+    private final DirectorService directorService;
+
+    public DirectorController(DirectorService directorService) {
+        this.directorService = directorService;
+    }
+
+    @GetMapping
+    public List<Director> getAllDirectors() {
+        return directorService.getAllDirectors();
+    }
+
+    @GetMapping("/{id}")
+    public Director getDirectorById(@PathVariable Long id) {
+        return directorService.getDirectorById(id);
+    }
+
+    @PostMapping
+    public Director createDirector(@RequestBody Director director) {
+        return directorService.saveDirector(director);
+    }
+
+    @PutMapping("/{id}")
+    public Director updateDirector(@PathVariable Long id, @RequestBody Director director) {
+        director.setId(id);
+        return directorService.saveDirector(director);
+    }
+
+    @DeleteMapping("/{id}")
+    public void deleteDirector(@PathVariable Long id) {
+        directorService.deleteDirector(id);
+    }
+}
+
+------
+
+
+
+
+
+//todo: complete missing code
+ class Book{
+    constructor(bookId, bookTitle,author,publishedYear){
+        this.bookId=bookId;
+        this.bookTitle=bookTitle;
+        this.author=author;
+        this.publishedYear=publishedYear;
+    }
+    displayDetails(){
+        return `Book ID: ${this.bookId}, Title: ${this.bookTitle}, Author: ${this.author}, Published Year: ${this.publishedYear}`;
+
+    }
+ } 
+
+ const myBook=new Book(1,"1984", "George Orwell", 1949);
+ document.addEventListener("DOMContentLoaded", () => {
+    const pElement=document.createElement('p');
+    pElement.textContent = myBook.displayDetails();
+    document.body.appendChild(pElement);
+
+ });
+
+module.exports = { Book, myBook };
+
