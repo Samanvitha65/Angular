@@ -1,0 +1,47 @@
+<div>
+    <h2>Movies</h2>
+    <div class="search-section">
+        <input
+        [(ngModel)]="searchText"
+        type="text"
+        class="form-control"
+        placeholder="Search by title or director"
+        (input)="filterMovies()"
+        />
+        </div>
+        <div class="sort-section mt-3">
+            <label for="sortBy">Sort by:</label>
+            <select id="sortBy" [(ngModel)]="sortBy" (change)="sortMovies()">
+            <option value="title">Title</option>
+            <option value="director">Director</option>
+            <option value="year">Year</option>
+            </select>
+            <button (click)="toggleSortOrder()">
+            Sort {{ isAscending ? 'Ascending' : 'Descending' }}
+            </button>
+            </div>
+    <button routerLink="/add" class="btn-btn-primary">AddButton</button>
+   <table *ngIf="movies.length > 0" class="table mt-3">
+    <thead>
+        <tr>
+            <th>Title</th>
+            <th>Director</th>
+            <th>Year</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr *ngFor="let movie of filteredmovies">
+            <td> {{ movie.title }} </td>
+        <td> {{ movie.director }} </td>
+        <td> {{ movie.year }} </td>
+
+        <td>
+            <button class="btn-btn-warning" (click)="editMovie(movie.id)">Edit</button>
+            <button class="btn-btn-danger" (click)="deleteMovie(movie.id)">Delete</button>
+        </td>
+    </tr>
+        
+    </tbody>
+   </table>
+</div>
