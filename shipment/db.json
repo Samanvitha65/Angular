@@ -1,0 +1,40 @@
+{
+  "shipments": [
+    {
+      "id": "1",
+      "sender": "Tech Corp",
+      "receiver": "Jane Doe",
+      "origin": "New York",
+      "destination": "San Francisco",
+      "status": "In Transit",
+      "expectedDelivery": "2023-09-20"
+    },
+    {
+      "id": 6,
+      "sender": "dev",
+      "receiver": "sam",
+      "origin": "yyuh",
+      "destination": "des",
+      "status": "ok",
+      "expectedDelivery": "2025-5-4"
+    },
+    {
+      "id": 33,
+      "sender": "var",
+      "receiver": "shit",
+      "origin": "yyuh",
+      "destination": "las",
+      "status": "ok",
+      "expectedDelivery": "2025-5-4"
+    },
+    {
+      "id": 33,
+      "sender": "var",
+      "receiver": "shit",
+      "origin": "yyuh",
+      "destination": "las",
+      "status": "ok",
+      "expectedDelivery": "2025-5-4"
+    }
+  ]
+}

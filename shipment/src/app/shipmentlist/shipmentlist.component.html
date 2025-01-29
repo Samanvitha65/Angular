@@ -1,0 +1,58 @@
+<div>
+    <h2>Shipment List</h2>
+    <div>
+    <input type="text" [(ngModel)]="searchText"  placeholder="Search By Id or Destination" (input)="filterShipment()">
+    <div class="sort-section mt-3">
+        <label for="sortBy">Sort by:</label>
+        <select id="sortBy" [(ngModel)]="sortBy" (change)="sortShipments()">
+        <option value="id">Id</option>
+        <option value="sender">Sender</option>
+        <option value="receiver">Receiver</option>
+        <option value="orgin">Origin</option>
+        <option value="destination">Destination</option>
+        <option value="expectedDelivery">Expected Delivery</option>
+        </select>
+        <button (click)="toggleSortOrder()">
+        Sort {{ isAscending ? 'Descending' : 'Ascending' }}
+        </button>
+        </div>
+        <button (click)="sortBySender()">SortBySender</button>
+    <button routerLink="/add">Add New Shipment</button>
+
+</div>
+<table border="5">
+    <thead>
+        <tr>
+            <th>Id</th>
+            <th>Sender</th>
+            <th>Receiver</th>
+            <th>Origin</th>
+            <th>Destination</th>
+            <th>Status</th>
+            <th>Expected Delivery</th>
+            <th>View Shipment</th>
+            <th>Edit Shipment</th>
+            <th>Delete Shipment</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr *ngFor="let shipment of filteredShipments">
+            
+                <td> {{ shipment.id }} </td>
+                <td> {{ shipment.sender }} </td>
+                <td> {{ shipment.receiver }} </td>
+                <td> {{ shipment.origin }} </td>
+                <td> {{ shipment.destination }} </td>
+                <td> {{ shipment.status }} </td>
+                <td> {{ shipment.expectedDelivery }} </td>
+                <td><button (click)="viewShipment(shipment.id)">View</button></td>
+                    <td><button (click)="editShipment(shipment.id)">Edit</button></td>
+                    <td><button (click)="deleteShipment(shipment.id)">Delete</button></td>
+                
+            </tr>
+       
+    </tbody>
+</table>
+
+
+</div>
